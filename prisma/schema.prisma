@@ -1,0 +1,46 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        String  @id
+  password  String
+  intentos  Int     @default(0)
+  bloqueado Boolean @default(false)
+}
+
+model Propietario {
+  idPropietario String     @id
+  nombre        String
+  telefono      String
+  correo        String
+  direccion     String
+  vehiculos     Vehiculo[]
+}
+
+model Vehiculo {
+  placa         String      @id
+  tipo          String      // 'Carro' o 'Moto'
+  marca         String
+  modelo        String
+  color         String
+  idPropietario String
+  propietario   Propietario @relation(fields: [idPropietario], references: [idPropietario])
+  citas         Cita[]
+}
+
+model Cita {
+  idCita        String   @id @default(uuid())
+  placaVehiculo String
+  tipoVehiculo  String
+  fechaHora     DateTime
+  estado        String   // 'Asignada' o 'Rechazada por Deuda'
+  vehiculo      Vehiculo @relation(fields: [placaVehiculo], references: [placa])
+}

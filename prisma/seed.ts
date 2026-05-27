@@ -12,104 +12,124 @@ async function main() {
   console.log('Iniciando proceso de siembra de datos (seed)...');
 
   // 1. Limpieza de datos existentes en orden inverso de dependencias relacionales
-  console.log('Limpiando tablas de base de datos...');
+  console.log('Limpiando tablas...');
   await prisma.cita.deleteMany({});
   await prisma.vehiculo.deleteMany({});
   await prisma.propietario.deleteMany({});
   await prisma.user.deleteMany({});
 
-  // 2. Creación de Usuario Administrador del Sistema
-  console.log('Creando usuario administrador...');
+  // 2. Creación de Usuarios del Sistema
+  console.log('Creando usuarios...');
   const adminPasswordHash = await bcrypt.hash('admin123', 10);
-  const adminUser = await prisma.user.create({
+  await prisma.user.create({
     data: {
       id: 'admin',
       password: adminPasswordHash,
+      nombres: 'Administrador CDA',
+      rol: 'ADMIN',
       intentos: 0,
       bloqueado: false,
     },
   });
-  console.log(`Usuario administrador creado: ${adminUser.id}`);
 
-  // 3. Creación de 3 Propietarios (Cumpliendo regla de exactamente 5 atributos principales)
-  console.log('Creando propietarios...');
-  const propietario1 = await prisma.propietario.create({
+  const tecnicoPasswordHash = await bcrypt.hash('tecnico123', 10);
+  await prisma.user.create({
     data: {
-      idPropietario: '10203040',
-      nombre: 'Juan Carlos Restrepo',
+      id: 'tecnico1',
+      password: tecnicoPasswordHash,
+      nombres: 'Carlos Pedraza',
+      rol: 'TECNICO',
+      intentos: 0,
+      bloqueado: false,
+    },
+  });
+  console.log('Usuarios creados: admin / tecnico1');
+
+  // 3. Creación de Propietarios
+  console.log('Creando propietarios...');
+  const p1 = await prisma.propietario.create({
+    data: {
+      id: '10203040',
+      tipoDocumento: 'CC',
+      nombres: 'Juan Carlos',
+      apellidos: 'Restrepo Giraldo',
       telefono: '3114567890',
-      correo: 'juan.restrepo@example.com',
+      email: 'juan.restrepo@example.com',
       direccion: 'Calle 10 # 43C - 20, Medellín',
     },
   });
 
-  const propietario2 = await prisma.propietario.create({
+  const p2 = await prisma.propietario.create({
     data: {
-      idPropietario: '20304050',
-      nombre: 'María Camila Gómez',
+      id: '20304050',
+      tipoDocumento: 'CC',
+      nombres: 'María Camila',
+      apellidos: 'Gómez Cardona',
       telefono: '3157890123',
-      correo: 'maria.gomez@example.com',
+      email: 'maria.gomez@example.com',
       direccion: 'Carrera 45 # 50 - 12, Envigado',
     },
   });
 
-  const propietario3 = await prisma.propietario.create({
+  const p3 = await prisma.propietario.create({
     data: {
-      idPropietario: '30405060',
-      nombre: 'Andrés Felipe Zapata',
+      id: '30405060',
+      tipoDocumento: 'CC',
+      nombres: 'Andrés Felipe',
+      apellidos: 'Zapata Londoño',
       telefono: '3005556677',
-      correo: 'andres.zapata@example.com',
+      email: 'andres.zapata@example.com',
       direccion: 'Avenida El Poblado # 25 - 60, Medellín',
     },
   });
   console.log('3 Propietarios creados.');
 
-  // 4. Creación de 3 Vehículos (Exactamente 5 atributos principales + FK de relación)
+  // 4. Creación de Vehículos
   console.log('Creando vehículos...');
-  
-  // Vehículo 1: Al día (Propietario 1)
   await prisma.vehiculo.create({
     data: {
       placa: 'EDF456',
-      tipo: 'Carro',
+      tipoVehiculo: 'Carro',
       marca: 'Mazda',
-      modelo: '2021',
+      linea: '3 Sedán',
+      modelo: 2021,
       color: 'Gris Metálico',
-      idPropietario: propietario1.idPropietario,
+      propietarioId: p1.id,
     },
   });
 
-  // Vehículo 2: En mora (Propietario 2) - Placa 'XMA15G'
   await prisma.vehiculo.create({
     data: {
       placa: 'XMA15G',
-      tipo: 'Moto',
+      tipoVehiculo: 'Moto',
       marca: 'Yamaha',
-      modelo: '2023',
+      linea: 'FZ 250',
+      modelo: 2023,
       color: 'Azul',
-      idPropietario: propietario2.idPropietario,
+      propietarioId: p2.id,
     },
   });
 
-  // Vehículo 3: En mora (Propietario 3) - Placa 'AAA123'
   await prisma.vehiculo.create({
     data: {
       placa: 'AAA123',
-      tipo: 'Carro',
+      tipoVehiculo: 'Carro',
       marca: 'Chevrolet',
-      modelo: '2018',
+      linea: 'Spark GT',
+      modelo: 2018,
       color: 'Rojo',
-      idPropietario: propietario3.idPropietario,
+      propietarioId: p3.id,
     },
   });
-  console.log('3 Vehículos creados (incluye placas morosas XMA15G y AAA123).');
+  console.log('3 Vehículos creados.');
 
-  console.log('Proceso de siembra de datos completado exitosamente.');
+  console.log('\n✅ Seed completado exitosamente.');
+  console.log('   Usuarios: admin (pass: admin123) / tecnico1 (pass: tecnico123)');
 }
 
 main()
   .catch((e) => {
-    console.error('Error durante la siembra de datos:', e);
+    console.error('❌ Error durante la siembra de datos:', e);
     process.exit(1);
   })
   .finally(async () => {

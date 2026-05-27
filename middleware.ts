@@ -21,7 +21,7 @@ export function middleware(request: NextRequest) {
   // 2. Redirigir al dashboard si ya está autenticado y accede a la raíz de login
   if (pathname === '/') {
     if (sessionUser) {
-      return NextResponse.redirect(new URL('/dashboard/registro', request.url));
+      return NextResponse.redirect(new URL('/dashboard', request.url));
     }
   }
 

@@ -1,5 +1,4 @@
 import { prisma } from '@/lib/prisma';
-import { VehiculoRegistrationDTO } from '@/types';
 
 /**
  * Servicio para el manejo de Vehículos.
@@ -9,21 +8,27 @@ import { VehiculoRegistrationDTO } from '@/types';
 export class VehiculoService {
   /**
    * Registra un nuevo vehículo en el sistema.
-   * @param dto Datos del vehículo.
    */
-  static async registrarVehiculo(dto: VehiculoRegistrationDTO) {
+  static async registrarVehiculo(dto: {
+    placa: string;
+    tipoVehiculo: string;
+    marca: string;
+    linea: string;
+    modelo: number;
+    color: string;
+    numeroChasis?: string;
+    numeroMotor?: string;
+    propietarioId: string;
+  }) {
     try {
-      const { placa, tipo, marca, modelo, color, idPropietario } = dto;
+      const { placa, tipoVehiculo, marca, linea, modelo, color, numeroChasis, numeroMotor, propietarioId } = dto;
 
-      // 1. Validar campos obligatorios
-      if (!placa || !tipo || !marca || !modelo || !color || !idPropietario) {
+      if (!placa || !tipoVehiculo || !marca || !linea || !modelo || !color || !propietarioId) {
         return { success: false, error: 'Todos los campos del vehículo son obligatorios.' };
       }
 
-      // 2. Normalizar placa (Ej: AAA123 o XMA15G)
       const placaNormalizada = placa.trim().toUpperCase();
 
-      // 3. Comprobar si el vehículo ya existe
       const vehiculoExistente = await prisma.vehiculo.findUnique({
         where: { placa: placaNormalizada },
       });
@@ -31,39 +36,39 @@ export class VehiculoService {
       if (vehiculoExistente) {
         return {
           success: false,
-          error: `El vehículo con placas ${placaNormalizada} ya se encuentra registrado en el sistema.`,
+          error: `El vehículo con placas ${placaNormalizada} ya se encuentra registrado.`,
         };
       }
 
-      // 4. REGLA DE NEGOCIO: Validar integridad relacional en el backend.
-      // No se puede registrar un vehículo si el idPropietario no existe.
       const propietarioExistente = await prisma.propietario.findUnique({
-        where: { idPropietario: idPropietario.trim() },
+        where: { id: propietarioId.trim() },
       });
 
       if (!propietarioExistente) {
         return {
           success: false,
-          error: `No es posible registrar el vehículo. El propietario con cédula ${idPropietario} no está registrado en el sistema. Regístrelo primero.`,
+          error: `No es posible registrar el vehículo. El propietario con documento ${propietarioId} no está registrado.`,
         };
       }
 
-      // 5. Crear el registro de vehículo en SQLite
       const nuevoVehiculo = await prisma.vehiculo.create({
         data: {
           placa: placaNormalizada,
-          tipo,
+          tipoVehiculo,
           marca: marca.trim(),
-          modelo: modelo.trim(),
+          linea: linea.trim(),
+          modelo,
           color: color.trim(),
-          idPropietario: idPropietario.trim(),
+          numeroChasis: numeroChasis?.trim() || null,
+          numeroMotor: numeroMotor?.trim() || null,
+          propietarioId: propietarioId.trim(),
         },
       });
 
       return { success: true, vehiculo: nuevoVehiculo };
     } catch (error) {
       console.error('Error en VehiculoService.registrarVehiculo:', error);
-      return { success: false, error: 'Ocurrió un error en el servidor al registrar el vehículo.' };
+      return { success: false, error: 'Ocurrió un error al registrar el vehículo.' };
     }
   }
 
@@ -85,7 +90,6 @@ export class VehiculoService {
 
   /**
    * Busca un vehículo por su placa.
-   * @param placa Placa del vehículo.
    */
   static async buscarPorPlaca(placa: string) {
     try {

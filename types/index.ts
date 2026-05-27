@@ -1,31 +1,39 @@
 /**
- * Definiciones de tipos estrictas e inmutables para el MVP de RTM.
- * De acuerdo con la skill 'typescript-expert', no se emplea el tipo 'any'.
+ * Definiciones de tipos para el Sistema CDA RTM.
+ * Alineados con el esquema de Prisma actualizado.
  */
 
 export interface User {
   readonly id: string;
+  readonly nombres?: string | null;
+  readonly rol: string;
   readonly intentos: number;
   readonly bloqueado: boolean;
 }
 
 export type TipoVehiculo = 'Carro' | 'Moto';
+export type TipoDocumento = 'CC' | 'NIT' | 'CE' | 'PASAPORTE';
 
 export interface Propietario {
-  readonly idPropietario: string; // Cédula del propietario
-  readonly nombre: string;
+  readonly id: string;
+  readonly tipoDocumento: string;
+  readonly nombres: string;
+  readonly apellidos: string;
   readonly telefono: string;
-  readonly correo: string;
+  readonly email: string;
   readonly direccion: string;
 }
 
 export interface Vehiculo {
   readonly placa: string;
-  readonly tipo: TipoVehiculo;
+  readonly tipoVehiculo: TipoVehiculo;
   readonly marca: string;
-  readonly modelo: string;
+  readonly linea: string;
+  readonly modelo: number;
   readonly color: string;
-  readonly idPropietario: string;
+  readonly numeroChasis?: string | null;
+  readonly numeroMotor?: string | null;
+  readonly propietarioId: string;
 }
 
 export type EstadoCita = 'Asignada' | 'Rechazada por Deuda';
@@ -38,7 +46,7 @@ export interface Cita {
   readonly estado: EstadoCita;
 }
 
-// Interfaces de transporte de datos (DTOs)
+// DTOs de transporte
 export interface LoginResponse {
   readonly success: boolean;
   readonly error?: string;
@@ -48,22 +56,5 @@ export interface LoginResponse {
 export interface CitaRegistrationDTO {
   readonly placaVehiculo: string;
   readonly tipoVehiculo: TipoVehiculo;
-  readonly fechaHora: string; // Viene serializado como ISO String
-}
-
-export interface PropietarioRegistrationDTO {
-  readonly idPropietario: string;
-  readonly nombre: string;
-  readonly telefono: string;
-  readonly correo: string;
-  readonly direccion: string;
-}
-
-export interface VehiculoRegistrationDTO {
-  readonly placa: string;
-  readonly tipo: TipoVehiculo;
-  readonly marca: string;
-  readonly modelo: string;
-  readonly color: string;
-  readonly idPropietario: string;
+  readonly fechaHora: string;
 }

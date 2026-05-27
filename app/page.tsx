@@ -1,44 +1,76 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import Alert from '@/components/ui/Alert';
-import Button from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
-import Card from '@/components/ui/Card';
+import { LockKeyhole, KeyRound } from 'lucide-react';
 
-/**
- * Pantalla de Inicio de Sesión (Login) del MVP RTM.
- * Implementa la directiva de UX Writing para el control de intentos fallidos
- * y bloqueo empático de la cuenta en color rojo crítico.
- */
+// --- Helpers de LocalStorage vinculados al userId ---
+const LOCK_KEY = (id: string) => `rtm_locked_user_${id.trim().toLowerCase()}`;
+
+function getIsLockedForUser(id: string): boolean {
+  if (!id.trim()) return false;
+  try {
+    return localStorage.getItem(LOCK_KEY(id)) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function setLockedForUser(id: string, locked: boolean) {
+  try {
+    if (locked) {
+      localStorage.setItem(LOCK_KEY(id), 'true');
+    } else {
+      localStorage.removeItem(LOCK_KEY(id));
+    }
+  } catch {
+    // Sin acceso a localStorage (SSR / privado)
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
-  
-  // Estados para formulario y carga
+
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  // Estados de control de intentos y bloqueo
   const [cuentaBloqueada, setCuentaBloqueada] = useState(false);
-  
-  // Estados para mensajes de error y notificaciones
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Efecto para verificar si ya estaba bloqueado en base de datos al renderizar (opcional en MVP)
-  useEffect(() => {
-    // Si la cuenta se bloquea en la sesión actual, la persistimos en memoria local del navegador
-    const isLocked = localStorage.getItem('rtm_account_locked') === 'true';
-    if (isLocked) {
-      setTimeout(() => {
-        setCuentaBloqueada(true);
-        setErrorMessage(
-          'Ingreso bloqueado por seguridad. Has superado el límite de 3 intentos fallidos permitidos por el sistema. Por favor, ponte en contacto con el administrador del sistema para restablecer tu cuenta.'
-        );
-      }, 0);
+  /**
+   * Cada vez que el userId cambia, verificamos si ESE usuario específico está
+   * bloqueado en localStorage. Si el nuevo usuario no está bloqueado,
+   * habilitamos el formulario inmediatamente.
+   */
+  const checkLockForCurrentUser = useCallback((id: string) => {
+    const locked = getIsLockedForUser(id);
+    setCuentaBloqueada(locked);
+    if (locked) {
+      setErrorMessage(
+        'Esta cuenta ha sido bloqueada por 3 intentos fallidos. Contacta al administrador.'
+      );
+    } else {
+      // Limpiamos el mensaje de error del usuario anterior al cambiar de usuario
+      setErrorMessage('');
     }
   }, []);
+
+  // Verificar al cargar la página sólo si ya había un userId previo guardado
+  useEffect(() => {
+    if (userId) checkLockForCurrentUser(userId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleUserIdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newId = e.target.value;
+    setUserId(newId);
+    setErrorMessage(''); // Limpiamos mensajes de error mientras el usuario escribe
+    if (newId.trim().length >= 3) {
+      checkLockForCurrentUser(newId);
+    } else {
+      setCuentaBloqueada(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,111 +89,125 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        // Reiniciamos contadores locales y limpiamos local storage si estaba bloqueado
-        localStorage.removeItem('rtm_account_locked');
-        // Redirigir al dashboard (Módulo de Registro)
-        router.push('/dashboard/registro');
+        setLockedForUser(userId, false);
+        router.push('/dashboard');
         router.refresh();
       } else {
-        // Manejo de errores basado en la respuesta del backend
         setErrorMessage(data.error || 'Credenciales inválidas.');
-        
+
         if (data.bloqueado) {
           setCuentaBloqueada(true);
-          localStorage.setItem('rtm_account_locked', 'true');
+          // 🔑 Clave: persistimos el bloqueo VINCULADO al userId específico
+          setLockedForUser(userId, true);
         }
       }
     } catch (err) {
-      console.error('Error de login en cliente:', err);
-      setErrorMessage('Ocurrió un error al intentar conectar con el servidor. Inténtelo más tarde.');
+      console.error('Error de login:', err);
+      setErrorMessage('Error al conectar con el servidor. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
   };
 
-  const cardTitle = (
-    <div className="text-center">
-      <div className="inline-flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-600 to-emerald-500 shadow-md">
-        {/* Icono de Llave de Seguridad */}
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-7 w-7 text-white">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-        </svg>
-      </div>
-      <h2 className="mt-6 text-3xl font-extrabold tracking-tight text-white">
-        Sistema Control RTM
-      </h2>
-    </div>
-  );
-
   return (
-    <div className="flex min-h-screen items-center justify-center bg-radial from-slate-900 via-slate-950 to-black px-4 py-12 sm:px-6 lg:px-8">
-      {/* Elemento de diseño de fondo premium (gradiente dinámico flotante) */}
-      <div className="absolute top-1/4 left-1/4 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl"></div>
-      <div className="absolute bottom-1/4 right-1/4 h-72 w-72 rounded-full bg-emerald-500/5 blur-3xl"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 px-4">
+      {/* Orbs de fondo decorativos */}
+      <div className="absolute top-1/4 left-1/4 h-80 w-80 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 h-80 w-80 rounded-full bg-indigo-600/5 blur-3xl pointer-events-none" />
 
       <div className="relative w-full max-w-md">
-        <Card
-          title={cardTitle}
-          subtitle="Control de Revisión Técnico Mecánica (Ley 769 de 2002)"
-          className="transition-all duration-300 hover:border-slate-700/80 shadow-2xl"
-        >
-          {/* Mensaje de Error de UX Writing (Empático y claro) */}
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+
+          {/* Header del card */}
+          <div className="px-8 pt-10 pb-6 text-center">
+            <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg mb-5">
+              <KeyRound className="h-8 w-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Sistema RTM</h1>
+            <p className="text-slate-400 text-sm mt-1">Control de Revisión Técnico Mecánica</p>
+          </div>
+
+          {/* Alerta de error / bloqueo */}
           {errorMessage && (
-            <Alert
-              variant={cuentaBloqueada ? 'critical' : 'warning'}
-              title={cuentaBloqueada ? 'Ingreso bloqueado por seguridad' : 'Atención'}
-              className="mb-6"
-            >
-              {errorMessage}
-            </Alert>
+            <div className={`mx-8 mb-4 p-3.5 rounded-xl border flex gap-3 text-sm ${
+              cuentaBloqueada
+                ? 'bg-red-500/10 border-red-500/30 text-red-300'
+                : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+            }`}>
+              <LockKeyhole className={`h-5 w-5 flex-shrink-0 mt-0.5 ${cuentaBloqueada ? 'text-red-400' : 'text-amber-400'}`} />
+              <span>{errorMessage}</span>
+            </div>
           )}
 
-          {/* Formulario de Login */}
-          <form className="space-y-6" onSubmit={handleSubmit}>
-            <div className="space-y-4 rounded-md">
-              <Input
-                id="userId"
-                label="Identificador de Usuario"
-                type="text"
-                required
-                disabled={cuentaBloqueada || loading}
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                placeholder="ej: admin"
-              />
+          {/* Formulario */}
+          <form onSubmit={handleSubmit} className="px-8 pb-8 space-y-5">
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="userId" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Identificador de Usuario
+                </label>
+                <input
+                  id="userId"
+                  type="text"
+                  value={userId}
+                  onChange={handleUserIdChange}
+                  placeholder="ej: admin"
+                  required
+                  autoComplete="username"
+                  disabled={loading}
+                  className="w-full px-4 py-2.5 rounded-lg border bg-slate-950/80 text-white placeholder-slate-600 text-sm outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed border-slate-800"
+                />
+              </div>
 
-              <Input
-                id="password"
-                label="Contraseña"
-                type="password"
-                required
-                disabled={cuentaBloqueada || loading}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-              />
+              <div>
+                <label htmlFor="password" className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1.5">
+                  Contraseña
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                  disabled={cuentaBloqueada || loading}
+                  className="w-full px-4 py-2.5 rounded-lg border bg-slate-950/80 text-white placeholder-slate-600 text-sm outline-none transition-all focus:border-blue-500 focus:ring-1 focus:ring-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed border-slate-800"
+                />
+              </div>
             </div>
 
-            <div>
-              <Button
-                type="submit"
-                variant="primary"
-                loading={loading}
-                disabled={cuentaBloqueada || !userId || !password}
-                className="w-full py-3"
-              >
-                Iniciar Sesión
-              </Button>
-            </div>
-          </form>
+            {/* Indicador del estado del usuario mientras escribe */}
+            {cuentaBloqueada && userId.trim() && (
+              <div className="flex items-center gap-2 text-xs text-red-400 bg-red-500/10 px-3 py-2 rounded-lg border border-red-500/20">
+                <LockKeyhole size={14} className="flex-shrink-0" />
+                <span>Usuario <strong className="font-mono">{userId.trim()}</strong> bloqueado. Ingresa otro usuario o contacta al administrador.</span>
+              </div>
+            )}
 
-          {/* Pié de página del card */}
-          <div className="text-center pt-6 mt-6 border-t border-slate-900">
-            <p className="text-xs text-slate-500">
-              © {new Date().getFullYear()} Centro de Diagnóstico Automotor (CDA). Todos los derechos reservados.
+            <button
+              type="submit"
+              disabled={cuentaBloqueada || !userId || !password || loading}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-lg transition-all duration-200 text-sm shadow"
+            >
+              {loading ? (
+                <>
+                  <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Verificando…
+                </>
+              ) : (
+                'Iniciar Sesión'
+              )}
+            </button>
+
+            <p className="text-center text-xs text-slate-600 pt-2">
+              © {new Date().getFullYear()} Centro de Diagnóstico Automotor (CDA).
             </p>
-          </div>
-        </Card>
+          </form>
+        </div>
       </div>
     </div>
   );

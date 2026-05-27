@@ -10,37 +10,80 @@ datasource db {
 }
 
 model User {
-  id        String  @id
+  id        String   @id
   password  String
-  intentos  Int     @default(0)
-  bloqueado Boolean @default(false)
+  nombres   String?
+  rol       String   @default("TECNICO") // 'ADMIN' o 'TECNICO'
+  intentos  Int      @default(0)
+  bloqueado Boolean  @default(false)
+  
+  citas     Cita[]
 }
 
 model Propietario {
-  idPropietario String     @id
-  nombre        String
+  id            String     @id // Trataremos la Cédula/NIT como llave primaria
+  tipoDocumento String     // 'CC', 'NIT', 'CE'
+  nombres       String
+  apellidos     String
   telefono      String
-  correo        String
+  email         String
   direccion     String
+  
   vehiculos     Vehiculo[]
+  citas         Cita[]
+
+  // Índice para búsquedas rápidas
+  @@index([nombres, apellidos])
 }
 
 model Vehiculo {
   placa         String      @id
-  tipo          String      // 'Carro' o 'Moto'
+  tipoVehiculo  String      // 'Carro' o 'Moto'
   marca         String
-  modelo        String
+  linea         String
+  modelo        Int         // Cambiado a entero
   color         String
-  idPropietario String
-  propietario   Propietario @relation(fields: [idPropietario], references: [idPropietario])
+  numeroChasis  String?     // Opcional
+  numeroMotor   String?
+  tieneDeuda    Boolean     @default(false)
+  
+  propietarioId String
+  propietario   Propietario @relation(fields: [propietarioId], references: [id], onDelete: Restrict)
+  
   citas         Cita[]
+
+  // Índice para búsquedas rápidas por Placa
+  @@index([placa])
+  @@index([propietarioId])
 }
 
 model Cita {
-  idCita        String   @id @default(uuid())
+  id            String   @id @default(uuid())
+  fecha         DateTime // Guardará la fecha (ej: 2024-05-15)
+  horaSlot      String   // Formato "HH:mm" (ej: "08:00")
+  estado        String   @default("PENDIENTE") // PENDIENTE, EN_PISTA, COMPLETADA, CANCELADA
+  observaciones String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   placaVehiculo String
-  tipoVehiculo  String
-  fechaHora     DateTime
-  estado        String   // 'Asignada' o 'Rechazada por Deuda'
-  vehiculo      Vehiculo @relation(fields: [placaVehiculo], references: [placa])
+  propietarioId String?
+  usuarioId     String?  // Inspector o recepcionista que atendió/agendó
+
+  vehiculo      Vehiculo     @relation(fields: [placaVehiculo], references: [placa], onDelete: Restrict)
+  propietario   Propietario? @relation(fields: [propietarioId], references: [id], onDelete: SetNull)
+  usuario       User?        @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  // Índices para optimizar búsquedas por agenda y evitar colisiones
+  @@index([fecha, horaSlot])
+  @@index([estado])
+  @@index([placaVehiculo])
 }
+
+model RechazoCita {
+  id            String   @id @default(uuid())
+  placaVehiculo String
+  fechaIntento  DateTime @default(now())
+  motivo        String
+}
+
